@@ -37,7 +37,7 @@ double false_position(double (*f)(double), double x, double y, int n, vector<dou
 
 int main() {
 
-    TITLE("Assignment 2 (Maybe) - Numerical Methods");
+    TITLE("Assignment 2 - Numerical Methods");
     AUTHOR("Balder W. Holst");
 
     //! This is exercise 2 from the 2023 exam. This assignment is about the estimating the error on the Regula Falsi (False Position) method.

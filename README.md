@@ -1,6 +1,41 @@
 # Reportify your C!
 This repo contains a script with compiles your C or C++ code into a nice report.
 
+## Usage
+```bash
+./reportify.py
+```
+
+*Output:*
+```
+Not enough arguments
+
+Usage: ./reportify.py [OPTIONS] <source.c> <executable>
+
+Options:
+  -h, --help            Display this help message
+  -g, --generate-header Generate header file
+```
+
+## Quick Start
+1. Copy `reportify.py` into your project.
+2. Generate header with the following:
+```bash
+./reportify.py --generate-header > "<some-include-dir>/reportify.h"
+```
+3. Include `reportify.h` in your source file
+4. Compile with your favorite compiler
+5. Generate `.tex` file
+```bash
+./reportify.py <source-file.c> <exe-file> > <tex-path.tex>
+```
+6. Generate `.pdf` with your favorite latex compiler. Here i use `pdflatex`:
+```bash
+pdflatex -interaction=nonstopmode -shell-escape <tex-path.tex>
+```
+
+Take a look at the [Makefile](./Makefile) for a concrete setup example.
+
 ## Example
 Using `reportify` you can write code like this:
 

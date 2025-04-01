@@ -34,6 +34,7 @@ TITLE_LABEL = "TITLE"
 AUTHOR_LABEL = "AUTHOR"
 DATE_LABEL = "DATE"
 SHOW_CODE_LABEL = "SHOW"
+HIDE_CODE_LABEL = "HIDE"
 SPAN_LABEL = "SPAN"
 CAPTURE_CODE_LABEL = "CAPTURE"
 OUTPUT_CODE_LABEL = "OUTPUT"
@@ -52,6 +53,7 @@ HEADER = f"""\
 #define {AUTHOR_LABEL}(S)
 #define {DATE_LABEL}(S)
 #define {SHOW_CODE_LABEL} std::cout << "\\n{SHOW_CODE_LABEL}" << std::endl;
+#define {HIDE_CODE_LABEL} std::cout << "\\n{HIDE_CODE_LABEL}" << std::endl;
 #define {CAPTURE_CODE_LABEL} std::cout << "\\n{CAPTURE_CODE_LABEL}" << std::endl;
 #define {OUTPUT_CODE_LABEL} std::cout << "\\n{OUTPUT_CODE_LABEL}" << std::endl;
 #define {SPAN_LABEL}(TITLE, FILE, START, END) std::cout << "\\n{SPAN_LABEL}: " << (TITLE) << ":" << (FILE) << ":" << (START) << ":" << (END) << std::endl;\
@@ -98,7 +100,7 @@ class Box(Block):
     def to_tex(self) -> str:
 
         s = ""
-        s += f"\\begin{{tcolorbox}}[enhanced, title=\\hspace{{-10pt}}\\vspace{{-2pt}}{self.title}\\vphantom{{g}}, colback={self.color}!10, title style={{baseline}}, boxsep=8pt, coltitle=black, fonttitle=\\bfseries, colbacktitle={self.color}!30, colframe=black, arc=2mm, boxrule=0.8pt, listing only, breakable]"
+        s += f"\\begin{{tcolorbox}}[enhanced, title=\\hspace{{-10pt}}\\vspace{{-2pt}}{self.title}\\vphantom{{g}}, colback={self.color}!10, title style={{baseline}}, boxsep=8pt, coltitle=black, fonttitle=\\bfseries, colbacktitle={self.color}!30, colframe=black, arc=2mm, boxrule=0.8pt, listing only]"
         s += f"\\begin{{minted}}[fontsize=\\footnotesize, autogobble, numbersep=6pt,"
         if self.linenos: s += "linenos, "
         s += f"breaklines, breakanywhere]{{{self.lang}}}\n"
@@ -178,6 +180,8 @@ class Document:
         source_cursor = 0
         output_cursor = 0
 
+        last_text_line = None
+
         code_start = None
         output_start = None
 
@@ -193,13 +197,33 @@ class Document:
 
             # Parse latex comments
             elif source_line.startswith(COMMENT_PREFIX):
+
+                if code_start is not None:
+                    txt = source_lines[code_start+1:source_cursor]
+                    if not all([l.strip() == "" for l in txt]):
+                        doc.blocks.append(CodeBox(txt))
+                if output_start is not None:
+                    txt = output_lines[output_start+1:output_cursor]
+                    if not all([l.strip() == "" for l in txt]):
+                        doc.blocks.append(OutputBox(txt))
+
+                code_start = None
+                output_start = None
+
                 latex = source_line[len(COMMENT_PREFIX):].strip()
 
                 # Append to previous text item if it is a text item
                 if len(doc.blocks) > 0 and isinstance(doc.blocks[-1], Text):
-                    doc.blocks[-1].text += "\n" + latex
+                    if last_text_line == source_cursor - 1:
+                        doc.blocks[-1].text += "\n" + latex
+                    else:
+                        # If the last section was text, but was separated by an empty line, add a line break
+                        doc.blocks[-1].text += r"\\" + "\n"
+                        doc.blocks.append(Text(latex))
                 else:
                     doc.blocks.append(Text(latex))
+
+                last_text_line = source_cursor
 
             # Parse SPAN statements in source code
             elif source_line.startswith(f"{SPAN_LABEL}"):
@@ -229,8 +253,8 @@ class Document:
                     output_cursor += 1
 
                 # Mark starting points
-                code_start = source_cursor
-                output_start = output_cursor
+                if not code_start:   code_start   = source_cursor
+                if not output_start: output_start = output_cursor
 
             # Parse CAPTURE statements in source code
             elif source_line.startswith(f"{CAPTURE_CODE_LABEL}"):
@@ -241,7 +265,7 @@ class Document:
 
                 # Mark starting points
                 code_start = None
-                output_start = output_cursor
+                if not output_start: output_start = output_cursor
 
 
             # Parse OUTPUT statements in source code
@@ -256,6 +280,21 @@ class Document:
 
                 if output_start is not None:
                     doc.blocks.append(OutputBox(output_lines[output_start+1:output_cursor]))
+
+                code_start = None
+                output_start = None
+
+
+            # Parse HIDE statements in source code
+            elif source_line.startswith(f"{HIDE_CODE_LABEL}"):
+
+                # Find the HIDE statement in the output
+                while not output_lines[output_cursor].strip().startswith(f"{HIDE_CODE_LABEL}"):
+                    output_cursor += 1
+
+                # Show code, but not output
+                if code_start is not None:
+                    doc.blocks.append(CodeBox(source_lines[code_start+1:source_cursor]))
 
                 code_start = None
                 output_start = None
@@ -366,7 +405,10 @@ def main():
 
     document = Document.from_source_and_output(source, output)
 
+    error(document.blocks)
+
     latex = document.to_tex()
+
 
     print(latex)
 
